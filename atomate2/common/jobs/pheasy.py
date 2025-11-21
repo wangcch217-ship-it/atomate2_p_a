@@ -322,9 +322,6 @@ def generate_phonon_displacements(
     n_harmonic = len(displacements)  # ← 记录数量
     
     n_anharmonic = 0
-    # 方案 C：非谐位移生成条件
-    # cal_anhar_fcs=True: 生成用于 2+3+4 阶力常数的位移
-    # cal_ther_cond=True: 生成用于 2+3 阶力常数的位移（热导率）
     if cal_anhar_fcs or cal_ther_cond:
         logger.info("=" * 80)
         if cal_anhar_fcs:
@@ -393,6 +390,7 @@ def generate_frequencies_eigenvectors(
     cal_anhar_fcs: bool,              # 四阶力常数（强非谐性）
     cal_ther_cond: bool,              # 热导率（三阶力常数）
     renorm_phonon: bool,
+    renorm_temp: list[int],           # ← 添加这行
     cal_ther_cond: bool,
     ther_cond_mesh: list[int],
     ther_cond_temp: list[int],
@@ -451,7 +449,7 @@ def generate_frequencies_eigenvectors(
     if renorm_phonon and not cal_anhar_fcs:
         logger.error("参数冲突: renorm_phonon=True 需要 cal_anhar_fcs=True")
         raise ValueError(
-            "声子重整化需要四阶力常数！\n"
+            "声子重整化需要四阶力常数（2+3+4 阶）！\n"
             "请设置: cal_anhar_fcs=True"
         )
     

@@ -201,6 +201,7 @@ def generate_phonon_displacements(
     displacement_anhar: float,
     num_disp_anhar: int,
     fcs_cutoff_radius: list[int],
+    cal_4th_order: bool = False,  # 🔥 添加这个参数
     sym_reduce: bool,
     symprec: float,
     use_symmetrized_structure: str | None,
@@ -378,6 +379,7 @@ def generate_frequencies_eigenvectors(
     displacement: float,
     cal_anhar_fcs: bool,
     fcs_cutoff_radius: list[int],
+    cal_4th_order: bool = False,  # 🔥 添加这个参数
     renorm_phonon: bool,
     cal_ther_cond: bool,
     ther_cond_mesh: list[int],
@@ -628,52 +630,80 @@ def generate_frequencies_eigenvectors(
     fc_file = _DEFAULT_FILE_PATHS["force_constants"]
 
     if cal_anhar_fcs:
-        np.save(
-            _DEFAULT_FILE_PATHS["anharmonic_displacements"],
-            dataset_disps_array_use[num_har:, :, :],
-        )
-        np.save(
-            _DEFAULT_FILE_PATHS["anharmonic_force_matrix"],
-            dataset_forces_array_disp[num_har:, :, :],
-        )
         num_anhar = dataset_forces_array_disp.shape[0] - num_har
 
-        # We next begin to generate the anharmonic force constants up to fourth
-        # order using the LASSO method
-        pheasy_cmd_5 = (
-            f"pheasy --dim {int(supercell_matrix[0][0])} "
-            f"{int(supercell_matrix[1][1])} "
-            f"{int(supercell_matrix[2][2])} -s -w 4 --symprec "
-            f"{float(symprec)} "
-            f"--nbody 2 3 3 --c3 {float(fcs_cutoff_radius[1] / 1.89)} "
-            f"--c4 {float(fcs_cutoff_radius[2] / 1.89)}"
-        )
+        if num_anhar > 0:
+            logger.info(f"Found {num_anhar} anharmonic displacement configurations")
 
-        pheasy_cmd_6 = (
-            f"pheasy --dim {int(supercell_matrix[0][0])} "
-            f"{int(supercell_matrix[1][1])} "
-            f"{int(supercell_matrix[2][2])} -c --symprec "
-            f"{float(symprec)} -w 4"
-        )
-        pheasy_cmd_7 = (
-            f"pheasy --dim {int(supercell_matrix[0][0])} "
-            f"{int(supercell_matrix[1][1])} "
-            f"{int(supercell_matrix[2][2])} -w 4 -d --symprec "
-            f"{float(symprec)} "
-            f"--ndata {int(num_anhar)} --disp_file"
-        )
-        pheasy_cmd_8 = (
-            f"pheasy --dim {int(supercell_matrix[0][0])} "
-            f"{int(supercell_matrix[1][1])} "
-            f"{int(supercell_matrix[2][2])} -f -w 4 --fix_fc2 "
-            f"--symprec {float(symprec)} "
-            f"--ndata {int(num_anhar)} "
-        )
+            np.save(
+                _DEFAULT_FILE_PATHS["anharmonic_displacements"],
+                dataset_disps_array_use[num_har:, :, :],
+            )
+            np.save(
+                _DEFAULT_FILE_PATHS["anharmonic_force_matrix"],
+                dataset_forces_array_disp[num_har:, :, :],
+            )
 
-        subprocess.call(shlex.split(pheasy_cmd_5))
-        subprocess.call(shlex.split(pheasy_cmd_6))
-        subprocess.call(shlex.split(pheasy_cmd_7))
-        subprocess.call(shlex.split(pheasy_cmd_8))
+            # 🔥 根据cal_4th_order决定计算哪些阶次
+            if cal_4th_order:
+                max_order = 4
+                nbody_str = "2 3 3"
+                cutoff_str = (
+                    f"--c3 {float(fcs_cutoff_radius[1] / 1.89)} "
+                    f"--c4 {float(fcs_cutoff_radius[2] / 1.89)}"
+                )
+                logger.info("Calculating up to 4th-order force constants")
+            else:
+                max_order = 3
+                nbody_str = "2 3"
+                cutoff_str = f"--c3 {float(fcs_cutoff_radius[1] / 1.89)}"
+                logger.info("Calculating up to 3rd-order force constants")
+
+            pheasy_cmd_5 = (
+                f"pheasy --dim {int(supercell_matrix[0][0])} "
+                f"{int(supercell_matrix[1][1])} "
+                f"{int(supercell_matrix[2][2])} -s -w {max_order} --symprec "
+                f"{float(symprec)} "
+                f"--nbody {nbody_str} {cutoff_str}"
+            )
+
+            pheasy_cmd_6 = (
+                f"pheasy --dim {int(supercell_matrix[0][0])} "
+                f"{int(supercell_matrix[1][1])} "
+                f"{int(supercell_matrix[2][2])} -c --symprec "
+                f"{float(symprec)} -w {max_order}"
+            )
+
+            pheasy_cmd_7 = (
+                f"pheasy --dim {int(supercell_matrix[0][0])} "
+                f"{int(supercell_matrix[1][1])} "
+                f"{int(supercell_matrix[2][2])} -w {max_order} -d --symprec "
+                f"{float(symprec)} "
+                f"--ndata {int(num_anhar)} --disp_file"
+            )
+
+            pheasy_cmd_8 = (
+                f"pheasy --dim {int(supercell_matrix[0][0])} "
+                f"{int(supercell_matrix[1][1])} "
+                f"{int(supercell_matrix[2][2])} -f -w {max_order} --fix_fc2 "
+                f"--symprec {float(symprec)} "
+                f"--ndata {int(num_anhar)} "
+            )
+
+            subprocess.call(shlex.split(pheasy_cmd_5))
+            subprocess.call(shlex.split(pheasy_cmd_6))
+            subprocess.call(shlex.split(pheasy_cmd_7))
+            subprocess.call(shlex.split(pheasy_cmd_8))
+
+            logger.info(f"Anharmonic force constants (up to {max_order}-order) calculation completed")
+        else:
+            logger.warning("="*60)
+            logger.warning("cal_anhar_fcs=True but no anharmonic displacement data found!")
+            logger.warning(f"Total displacements: {dataset_forces_array_disp.shape[0]}")
+            logger.warning(f"Harmonic displacements: {num_har}")
+            logger.warning(f"Anharmonic displacements: {num_anhar}")
+            logger.warning("Skipping anharmonic force constants calculation")
+            logger.warning("="*60)
 
     # begin to renormzlize the phonon energies
     if renorm_phonon:

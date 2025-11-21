@@ -155,6 +155,7 @@ class PhononMaker(BasePhononMaker):
     num_displaced_supercells: int = 0
     num_disp_anhar: int = 0
     fcs_cutoff_radius: list = field(default_factory=lambda: [-1, 12, 10])
+    cal_4th_order: bool = False  # 🔥 添加这个
     min_length: float | None = 8.0
     max_atoms: float | None = 200
     force_90_degrees: bool = True

@@ -12,13 +12,21 @@ from atomate2.common.jobs.pheasy import (
     generate_phonon_displacements,
     get_supercell_size,
 )
-from atomate2.common.jobs.phonons import run_phonon_displacements
+from atomate2.common.jobs.phonons import (
+    run_phonon_displacements,
+    get_total_energy_per_cell,  # ← 新增
+)
+from atomate2.common.jobs.utils import (  # ← 新增整个 import
+    structure_to_conventional,
+    structure_to_primitive,
+)
+from jobflow import Flow  # ← 新增
 
 if TYPE_CHECKING:
     from pathlib import Path
 
     from emmet.core.math import Matrix3D
-    from jobflow import Flow, Job
+    from jobflow import Job
     from pymatgen.core.structure import Structure
 
     from atomate2.aims.jobs.base import BaseAimsMaker
@@ -171,6 +179,7 @@ class BasePhononMaker(PurePhonopyMaker, ABC):
     fcs_cutoff_radius: list = field(
         default_factory=lambda: [-1, 12, 10]
     )  # units in Bohr
+    cal_4th_order: bool = False  # 🔥 添加这行
     renorm_phonon: bool = False
     renorm_temp: list = field(default_factory=lambda: [100, 700, 100])
     cal_ther_cond: bool = False
@@ -402,6 +411,7 @@ class BasePhononMaker(PurePhonopyMaker, ABC):
             displacement_anhar=self.displacement_anhar,
             num_disp_anhar=self.num_disp_anhar,
             fcs_cutoff_radius=self.fcs_cutoff_radius,
+            cal_4th_order=self.cal_4th_order,  # 🔥 添加这行
             sym_reduce=self.sym_reduce,
             symprec=self.symprec,
             use_symmetrized_structure=self.use_symmetrized_structure,
@@ -485,6 +495,7 @@ class BasePhononMaker(PurePhonopyMaker, ABC):
             displacement=self.displacement,
             cal_anhar_fcs=self.cal_anhar_fcs,
             fcs_cutoff_radius=self.fcs_cutoff_radius,
+            cal_4th_order=self.cal_4th_order,  # 🔥 添加这行
             renorm_phonon=self.renorm_phonon,
             renorm_temp=self.renorm_temp,
             cal_ther_cond=self.cal_ther_cond,

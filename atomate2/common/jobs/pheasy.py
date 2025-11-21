@@ -385,13 +385,11 @@ def generate_frequencies_eigenvectors(
     structure: Structure,
     supercell_matrix: np.array,
     displacement: float,
-    cal_anhar_fcs: bool,
     fcs_cutoff_radius: list[int],
     cal_anhar_fcs: bool,              # 四阶力常数（强非谐性）
     cal_ther_cond: bool,              # 热导率（三阶力常数）
     renorm_phonon: bool,
     renorm_temp: list[int],           # ← 添加这行
-    cal_ther_cond: bool,
     ther_cond_mesh: list[int],
     ther_cond_temp: list[int],
     sym_reduce: bool,

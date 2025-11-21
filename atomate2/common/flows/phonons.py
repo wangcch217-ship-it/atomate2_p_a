@@ -333,7 +333,6 @@ class BasePhononMaker(Maker, ABC):
             born_run_job_dir,
             born_run_uuid,
             displacement_calcs,
-            displacements,  # ← 加这一行
             epsilon_static,
             optimization_run_job_dir,
             optimization_run_uuid,

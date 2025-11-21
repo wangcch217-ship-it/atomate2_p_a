@@ -197,11 +197,11 @@ def generate_phonon_displacements(
     supercell_matrix: np.array,
     displacement: float,
     num_displaced_supercells: int,
-    cal_anhar_fcs: bool,
+    cal_anhar_fcs: bool,   # 四阶力常数（强非谐性）
+    cal_ther_cond: bool,  # 热导率（三阶力常数）
     displacement_anhar: float,
     num_disp_anhar: int,
     fcs_cutoff_radius: list[int],
-    cal_4th_order: bool = False,  # 🔥 添加这个参数
     sym_reduce: bool,
     symprec: float,
     use_symmetrized_structure: str | None,
@@ -322,9 +322,17 @@ def generate_phonon_displacements(
     n_harmonic = len(displacements)  # ← 记录数量
     
     n_anharmonic = 0
-    # Here, the ALAMODE code is used to determine the number of
-    # third and fourth-order FCs are needed for the supercell
-    if cal_anhar_fcs:
+    # 方案 C：非谐位移生成条件
+    # cal_anhar_fcs=True: 生成用于 2+3+4 阶力常数的位移
+    # cal_ther_cond=True: 生成用于 2+3 阶力常数的位移（热导率）
+    if cal_anhar_fcs or cal_ther_cond:
+        logger.info("=" * 80)
+        if cal_anhar_fcs:
+            logger.info("生成非谐位移（用于完整非谐性：2+3+4 阶）")
+        else:
+            logger.info("生成非谐位移（用于热导率：2+3 阶）")
+        logger.info("=" * 80)
+        
         # Due to the cutoff radius of the force constants use the unit of Borh in ALM,
         # we need to convert the cutoff radius from Angstrom to Bohr.
         with ALM(lattice * 1.89, positions, numbers) as alm:
@@ -345,7 +353,10 @@ def generate_phonon_displacements(
             num_d_anh = int(np.ceil(n_rd_anh / (3.0 * natom)))
             num_dis_cells_anhar = num_disp_anhar if num_disp_anhar != 0 else num_d_anh
         #源代码 
-        num_dis_cells_anhar = 20
+        #num_dis_cells_anhar = 20
+        logger.info(f"ALM suggested {num_d_anh} anharmonic displacements")
+        logger.info(f"Using {num_dis_cells_anhar} anharmonic displacements")
+
         # generate the supercells for anharmonic force constants
         phonon.generate_displacements(
             distance=displacement_anhar,
@@ -379,7 +390,8 @@ def generate_frequencies_eigenvectors(
     displacement: float,
     cal_anhar_fcs: bool,
     fcs_cutoff_radius: list[int],
-    cal_4th_order: bool = False,  # 🔥 添加这个参数
+    cal_anhar_fcs: bool,              # 四阶力常数（强非谐性）
+    cal_ther_cond: bool,              # 热导率（三阶力常数）
     renorm_phonon: bool,
     cal_ther_cond: bool,
     ther_cond_mesh: list[int],
@@ -430,6 +442,50 @@ def generate_frequencies_eigenvectors(
     kwargs: dict
         Additional parameters that are passed to PhononBSDOSDoc.from_forces_born
     """
+    # ========== 参数验证==========
+    logger.info("=" * 80)
+    logger.info("验证输入参数")
+    logger.info("=" * 80)
+    
+    # 验证1: 声子重整化需要四阶力常数
+    if renorm_phonon and not cal_anhar_fcs:
+        logger.error("参数冲突: renorm_phonon=True 需要 cal_anhar_fcs=True")
+        raise ValueError(
+            "声子重整化需要四阶力常数！\n"
+            "请设置: cal_anhar_fcs=True"
+        )
+    
+    # 验证2: 截断半径检查
+    if cal_anhar_fcs or cal_ther_cond:
+        if len(fcs_cutoff_radius) < 2:
+            raise ValueError(
+                f"非谐计算需要至少 [2阶, 3阶] 截断半径\n"
+                f"当前: {fcs_cutoff_radius}"
+            )
+        
+        if cal_anhar_fcs and len(fcs_cutoff_radius) < 3:
+            logger.warning("四阶截断半径未定义，使用默认值 10 Bohr")
+            fcs_cutoff_radius.append(10)
+    
+    # 显示配置
+    logger.info("")
+    logger.info("计算配置:")
+    logger.info(f"   ├─ 谐波声子: 是")
+    
+    if cal_anhar_fcs:
+        logger.info(f"   ├─ 完整非谐性: 是 (2+3+4 阶)")
+        logger.info(f"   │  └─ 用于：声子重整化")
+    elif cal_ther_cond:
+        logger.info(f"   ├─ 三阶力常数: 是 (2+3 阶)")
+        logger.info(f"   │  └─ 用于：热导率")
+    else:
+        logger.info(f"   ├─ 非谐效应: 否")
+    
+    logger.info(f"   ├─ 热导率: {'是' if cal_ther_cond else '否'}")
+    logger.info(f"   └─ 声子重整化: {'是' if renorm_phonon else '否'}")
+    logger.info("=" * 80)
+    logger.info("")
+    
     phonon = _generate_phonon_object(
         structure,
         supercell_matrix,
@@ -629,11 +685,17 @@ def generate_frequencies_eigenvectors(
     # somehow getting generated in some temp directory. Can you fix the bug?
     fc_file = _DEFAULT_FILE_PATHS["force_constants"]
 
-    if cal_anhar_fcs:
+    if cal_anhar_fcs or cal_ther_cond:
         num_anhar = dataset_forces_array_disp.shape[0] - num_har
 
         if num_anhar > 0:
-            logger.info(f"Found {num_anhar} anharmonic displacement configurations")
+            logger.info("=" * 80)
+            if cal_anhar_fcs:
+                logger.info("计算完整非谐力常数（2+3+4 阶）")
+            else:
+                logger.info("计算三阶力常数（用于热导率：2+3 阶）")
+            logger.info("=" * 80)
+            logger.info(f"非谐位移数: {num_anhar}")
 
             np.save(
                 _DEFAULT_FILE_PATHS["anharmonic_displacements"],
@@ -644,20 +706,25 @@ def generate_frequencies_eigenvectors(
                 dataset_forces_array_disp[num_har:, :, :],
             )
 
-            # 🔥 根据cal_4th_order决定计算哪些阶次
-            if cal_4th_order:
+            #根据 cal_anhar_fcs 决定计算阶次
+            if cal_anhar_fcs:
+                # 完整非谐性：2+3+4 阶
                 max_order = 4
-                nbody_str = "2 3 3"
+                nbody_str = "2 3 4"
                 cutoff_str = (
                     f"--c3 {float(fcs_cutoff_radius[1] / 1.89)} "
                     f"--c4 {float(fcs_cutoff_radius[2] / 1.89)}"
                 )
-                logger.info("Calculating up to 4th-order force constants")
+                logger.info("模式: 完整非谐性 (2+3+4 阶)")
+                logger.info(f"   - 3阶截断: {fcs_cutoff_radius[1]} Bohr")
+                logger.info(f"   - 4阶截断: {fcs_cutoff_radius[2]} Bohr")
             else:
+                # 热导率：2+3 阶
                 max_order = 3
                 nbody_str = "2 3"
                 cutoff_str = f"--c3 {float(fcs_cutoff_radius[1] / 1.89)}"
-                logger.info("Calculating up to 3rd-order force constants")
+                logger.info("模式: 热导率 (2+3 阶)")
+                logger.info(f"   - 3阶截断: {fcs_cutoff_radius[1]} Bohr")
 
             pheasy_cmd_5 = (
                 f"pheasy --dim {int(supercell_matrix[0][0])} "
@@ -728,7 +795,7 @@ def generate_frequencies_eigenvectors(
 
             logger.info("Generated fc2.hdf5 from harmonic force constants")
 
-            # 🔧 修复：只有在三阶力常数文件存在时才进行热导率计算
+            # 修复：只有在三阶力常数文件存在时才进行热导率计算
             fc3_file = "FORCE_CONSTANTS_3RD"
             if os.path.exists(fc3_file):
                 logger.info("Found FORCE_CONSTANTS_3RD, proceeding with thermal conductivity calculation")

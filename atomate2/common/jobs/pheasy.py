@@ -318,7 +318,7 @@ def generate_phonon_displacements(
         )
 
     supercells = phonon.supercells_with_displacements
-    displacements = [get_pmg_structure(cell) for cell in supercells]
+    displacements = [get_pmg_structure(cell) for cell in supercells_harmonic]
     n_harmonic = len(displacements)  # ← 记录数量
     
     n_anharmonic = 0
@@ -355,13 +355,27 @@ def generate_phonon_displacements(
         logger.info(f"Using {num_dis_cells_anhar} anharmonic displacements")
 
         # generate the supercells for anharmonic force constants
-        phonon.generate_displacements(
+        # 重新创建 phonon 对象，避免覆盖谐波位移
+        phonon_anhar = _generate_phonon_object(
+            structure,
+            supercell_matrix,
+            displacement_anhar,
+            sym_reduce,
+            symprec,
+            use_symmetrized_structure,
+            kpath_scheme,
+            code,
+            verbose=verbose,
+        )
+        
+        # generate the supercells for anharmonic force constants
+        phonon_anhar.generate_displacements(
             distance=displacement_anhar,
             number_of_snapshots=num_dis_cells_anhar,
             random_seed=random_seed,
         )
-        supercells = phonon.supercells_with_displacements
-        anharmonic_disps = [get_pmg_structure(cell) for cell in supercells] 
+        supercells_anhar = phonon_anhar.supercells_with_displacements
+        anharmonic_disps = [get_pmg_structure(cell) for cell in supercells_anhar]
         n_anharmonic = len(anharmonic_disps)  # ← 记录数量
         displacements += anharmonic_disps
 

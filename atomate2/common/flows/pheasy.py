@@ -180,6 +180,8 @@ class BasePhononMaker(PurePhonopyMaker, ABC):
         default_factory=lambda: [-1, 12, 10]
     )  # units in Bohr
     cal_ther_cond: bool = False
+    renorm_phonon: bool = False
+    renorm_temp: list = field(default_factory=lambda: [100, 700, 100])
     ther_cond_mesh: list = field(default_factory=lambda: [20, 20, 20])
     ther_cond_temp: list = field(default_factory=lambda: [100, 700, 100])
     min_length: float | None = 8.0
@@ -408,6 +410,7 @@ class BasePhononMaker(PurePhonopyMaker, ABC):
             displacement_anhar=self.displacement_anhar,
             num_disp_anhar=self.num_disp_anhar,
             fcs_cutoff_radius=self.fcs_cutoff_radius,
+            cal_ther_cond=self.cal_ther_cond,  # ← 确保有这行
             sym_reduce=self.sym_reduce,
             symprec=self.symprec,
             use_symmetrized_structure=self.use_symmetrized_structure,
@@ -491,7 +494,6 @@ class BasePhononMaker(PurePhonopyMaker, ABC):
             displacement=self.displacement,
             cal_anhar_fcs=self.cal_anhar_fcs,
             fcs_cutoff_radius=self.fcs_cutoff_radius,
-            cal_4th_order=self.cal_4th_order,  # 🔥 添加这行
             renorm_phonon=self.renorm_phonon,
             renorm_temp=self.renorm_temp,
             cal_ther_cond=self.cal_ther_cond,

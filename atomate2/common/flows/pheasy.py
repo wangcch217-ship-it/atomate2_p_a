@@ -179,9 +179,6 @@ class BasePhononMaker(PurePhonopyMaker, ABC):
     fcs_cutoff_radius: list = field(
         default_factory=lambda: [-1, 12, 10]
     )  # units in Bohr
-    cal_4th_order: bool = False  # 🔥 添加这行
-    renorm_phonon: bool = False
-    renorm_temp: list = field(default_factory=lambda: [100, 700, 100])
     cal_ther_cond: bool = False
     ther_cond_mesh: list = field(default_factory=lambda: [20, 20, 20])
     ther_cond_temp: list = field(default_factory=lambda: [100, 700, 100])
@@ -411,7 +408,6 @@ class BasePhononMaker(PurePhonopyMaker, ABC):
             displacement_anhar=self.displacement_anhar,
             num_disp_anhar=self.num_disp_anhar,
             fcs_cutoff_radius=self.fcs_cutoff_radius,
-            cal_4th_order=self.cal_4th_order,  # 🔥 添加这行
             sym_reduce=self.sym_reduce,
             symprec=self.symprec,
             use_symmetrized_structure=self.use_symmetrized_structure,
